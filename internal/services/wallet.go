@@ -1,0 +1,161 @@
+package services
+
+import (
+	"e-commerce_marketplace/internal/models"
+	"e-commerce_marketplace/internal/repositories"
+	"e-commerce_marketplace/pkg/utils"
+)
+
+type WalletService interface {
+	// CreateWallet creates a new wallet for a user
+	CreateWallet(walletUserID string) (*models.Wallet, error)
+	
+	// GetWallet retrieves a wallet by wallet user ID
+	GetWallet(walletUserID string) (*models.Wallet, error)
+	
+	// AddBalance adds amount to specified balance type
+	AddBalance(walletUserID string, req *utils.UpdateBalanceRequest) (*models.Wallet, error)
+	
+	// DeductBalance deducts amount from specified balance type
+	DeductBalance(walletUserID string, req *utils.UpdateBalanceRequest) (*models.Wallet, error)
+}
+
+type walletService struct {
+	walletRepo repositories.WalletRepository
+}
+
+func NewWalletService(walletRepo repositories.WalletRepository) WalletService {
+	return &walletService{
+		walletRepo: walletRepo,
+	}
+}
+
+func (s *walletService) CreateWallet(walletUserID string) (*models.Wallet, error) {
+	// Cek apakah wallet sudah ada untuk user ini
+	exists, err := s.walletRepo.ExistsByWalletUserID(walletUserID)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, utils.NewWalletError(utils.CodeWalletExists, "Wallet already exists for this user", "")
+	}
+
+	// Buat initial balances
+	initialBalances := &models.BalanceData{
+		Coins: 0,
+		EXP:   0,
+	}
+
+	// Buat wallet baru
+	wallet := &models.Wallet{
+		WalletUserID: walletUserID,
+	}
+
+	// Set balances awal
+	if err := wallet.SetBalances(initialBalances); err != nil {
+		return nil, utils.NewWalletError(utils.CodeInternalError, "Failed to set initial balances", err.Error())
+	}
+
+	// Simpan ke repository
+	if err := s.walletRepo.Create(wallet); err != nil {
+		return nil, err
+	}
+
+	return wallet, nil
+}
+
+func (s *walletService) GetWallet(walletUserID string) (*models.Wallet, error) {
+	return s.walletRepo.GetByWalletUserID(walletUserID)
+}
+
+func (s *walletService) AddBalance(walletUserID string, req *utils.UpdateBalanceRequest) (*models.Wallet, error) {
+	// Validate request
+	if validationErrors := utils.ValidateStruct(req); len(validationErrors) > 0 {
+		return nil, utils.NewWalletError(utils.CodeValidationError, "Validation failed", "")
+	}
+
+	// Additional validation
+	if err := utils.ValidateBalanceType(req.BalanceType); err != nil {
+		return nil, err
+	}
+	if err := utils.ValidateAmount(req.Amount); err != nil {
+		return nil, err
+	}
+
+	// Get existing wallet
+	wallet, err := s.walletRepo.GetByWalletUserID(walletUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get current balances
+	balances, err := wallet.GetBalances()
+	if err != nil {
+		return nil, utils.NewWalletError(utils.CodeInternalError, "Failed to parse current balances", err.Error())
+	}
+
+	// Update balance based on type
+	switch req.BalanceType {
+	case "coins":
+		balances.Coins += req.Amount
+	case "exp":
+		balances.EXP += req.Amount
+	}
+
+	// Update wallet balances
+	if err := s.walletRepo.UpdateBalances(walletUserID, balances); err != nil {
+		return nil, err
+	}
+
+	// Return updated wallet
+	return s.walletRepo.GetByWalletUserID(walletUserID)
+}
+
+func (s *walletService) DeductBalance(walletUserID string, req *utils.UpdateBalanceRequest) (*models.Wallet, error) {
+	// Validate request
+	if validationErrors := utils.ValidateStruct(req); len(validationErrors) > 0 {
+		return nil, utils.NewWalletError(utils.CodeValidationError, "Validation failed", "")
+	}
+
+	// Additional validation
+	if err := utils.ValidateBalanceType(req.BalanceType); err != nil {
+		return nil, err
+	}
+	if err := utils.ValidateAmount(req.Amount); err != nil {
+		return nil, err
+	}
+
+	// Get existing wallet
+	wallet, err := s.walletRepo.GetByWalletUserID(walletUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get current balances
+	balances, err := wallet.GetBalances()
+	if err != nil {
+		return nil, utils.NewWalletError(utils.CodeInternalError, "Failed to parse current balances", err.Error())
+	}
+
+	// Check and update balance based on type
+	switch req.BalanceType {
+	case "coins":
+		if balances.Coins < req.Amount {
+			return nil, utils.NewWalletError(utils.CodeInsufficientBalance, "Insufficient coins balance", "")
+		}
+		balances.Coins -= req.Amount
+	case "exp":
+		if balances.EXP < req.Amount {
+			return nil, utils.NewWalletError(utils.CodeInsufficientBalance, "Insufficient EXP balance", "")
+		}
+		balances.EXP -= req.Amount
+	}
+
+	// Update wallet balances
+	if err := s.walletRepo.UpdateBalances(walletUserID, balances); err != nil {
+		return nil, err
+	}
+
+	// Return updated wallet
+	return s.walletRepo.GetByWalletUserID(walletUserID)
+}
