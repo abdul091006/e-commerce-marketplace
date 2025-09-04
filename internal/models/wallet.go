@@ -23,8 +23,8 @@ func (Wallet) TableName() string {
 
 // BalanceData represents the structure of the balances JSON field
 type BalanceData struct {
-	Coins int64 `json:"coins"`
-	EXP   int64 `json:"exp"`
+	Coins float64 `json:"coins"`
+	EXP   float64 `json:"exp"`
 }
 
 // GetBalances parses the JSONB balances field into BalanceData

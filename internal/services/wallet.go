@@ -4,6 +4,9 @@ import (
 	"e-commerce_marketplace/internal/models"
 	"e-commerce_marketplace/internal/repositories"
 	"e-commerce_marketplace/pkg/utils"
+	"fmt"
+
+	"strconv"
 )
 
 type WalletService interface {
@@ -74,11 +77,13 @@ func (s *walletService) AddBalance(walletUserID string, req *utils.UpdateBalance
 		return nil, utils.NewWalletError(utils.CodeValidationError, "Validation failed", "")
 	}
 
+	amountFloat, _ := strconv.ParseFloat(req.Amount, 64)
+
 	// Additional validation
 	if err := utils.ValidateBalanceType(req.BalanceType); err != nil {
 		return nil, err
 	}
-	if err := utils.ValidateAmount(req.Amount); err != nil {
+	if err := utils.ValidateAmount(amountFloat); err != nil {
 		return nil, err
 	}
 
@@ -97,9 +102,9 @@ func (s *walletService) AddBalance(walletUserID string, req *utils.UpdateBalance
 	// Update balance based on type
 	switch req.BalanceType {
 	case "coins":
-		balances.Coins += req.Amount
+		balances.Coins += amountFloat
 	case "exp":
-		balances.EXP += req.Amount
+		balances.EXP += amountFloat
 	}
 
 	// Update wallet balances
@@ -117,11 +122,13 @@ func (s *walletService) DeductBalance(walletUserID string, req *utils.UpdateBala
 		return nil, utils.NewWalletError(utils.CodeValidationError, "Validation failed", "")
 	}
 
+	amountFloat, _ := strconv.ParseFloat(req.Amount, 64)
+
 	// Additional validation
 	if err := utils.ValidateBalanceType(req.BalanceType); err != nil {
 		return nil, err
 	}
-	if err := utils.ValidateAmount(req.Amount); err != nil {
+	if err := utils.ValidateAmount(amountFloat); err != nil {
 		return nil, err
 	}
 
@@ -140,15 +147,23 @@ func (s *walletService) DeductBalance(walletUserID string, req *utils.UpdateBala
 	// Check and update balance based on type
 	switch req.BalanceType {
 	case "coins":
-		if balances.Coins < req.Amount {
-			return nil, utils.NewWalletError(utils.CodeInsufficientBalance, "Insufficient coins balance", "")
+		if balances.Coins < amountFloat {
+			return nil, utils.NewWalletError(
+				utils.CodeInsufficientBalance,
+				"Insufficient coin balance",
+				fmt.Sprintf("Current balance: %.2f, required: %.2f", balances.Coins, amountFloat),
+			)
 		}
-		balances.Coins -= req.Amount
+		balances.Coins -= amountFloat
 	case "exp":
-		if balances.EXP < req.Amount {
-			return nil, utils.NewWalletError(utils.CodeInsufficientBalance, "Insufficient EXP balance", "")
+		if balances.EXP < amountFloat {
+			return nil, utils.NewWalletError(
+				utils.CodeInsufficientBalance,
+				"Insufficient EXP balance",
+				fmt.Sprintf("Current balance: %.2f, required: %.2f", balances.EXP, amountFloat),
+			)
 		}
-		balances.EXP -= req.Amount
+		balances.EXP -= amountFloat
 	}
 
 	// Update wallet balances
