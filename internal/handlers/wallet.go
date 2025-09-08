@@ -1,8 +1,9 @@
 package handlers
 
 import (
-	"e-commerce_marketplace/pkg/utils"
 	"e-commerce_marketplace/internal/services"
+	"e-commerce_marketplace/pkg/utils"
+	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -88,6 +89,9 @@ func (h *WalletHandler) DeductBalance(c *fiber.Ctx) error {
 
 // handleServiceError converts service errors to appropriate HTTP responses
 func (h *WalletHandler) handleServiceError(c *fiber.Ctx, err error) error {
+	// DEBUG: log full error ke terminal
+	fmt.Printf("[WalletHandler] error: %+v\n", err)
+
 	if utils.IsWalletError(err) {
 		walletErr := err.(*utils.WalletError)
 		switch walletErr.Code {
@@ -100,8 +104,11 @@ func (h *WalletHandler) handleServiceError(c *fiber.Ctx, err error) error {
 		case utils.CodeInvalidAmount, utils.CodeInvalidBalanceType, utils.CodeValidationError:
 			return utils.BadRequestResponse(c, walletErr.Message, walletErr.Details)
 		default:
+			// ada error tapi kita gak tau → balikin generic
 			return utils.InternalServerErrorResponse(c, "An error occurred while processing your request")
 		}
 	}
+
+	// kalau error bukan WalletError, anggap unexpected
 	return utils.InternalServerErrorResponse(c, "An unexpected error occurred")
 }

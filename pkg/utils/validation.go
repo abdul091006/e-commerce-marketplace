@@ -64,20 +64,6 @@ func ValidateWalletUserID(walletUserID string) error {
 	return nil
 }
 
-// ValidateBalanceType validates balance type
-func ValidateBalanceType(balanceType string) error {
-	validTypes := map[string]bool{
-		"coins": true,
-		"exp":   true,
-	}
-
-	if !validTypes[balanceType] {
-		return NewWalletError(CodeInvalidBalanceType, "invalid balance type", "allowed types: coins, exp")
-	}
-
-	return nil
-}
-
 // ValidateAmount validates amount value (float64)
 func ValidateAmount(amount float64) error {
 	if amount <= 0 {

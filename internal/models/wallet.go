@@ -10,7 +10,7 @@ import (
 
 type Wallet struct {
 	WalletUserID string         `json:"wallet_user_id" gorm:"unique;not null;index"`
-	Balances     datatypes.JSON `json:"balances" gorm:"type:jsonb;default:'{\"coins\":0,\"exp\":0}'"`
+	Balances     datatypes.JSON `json:"balances"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `json:"-" gorm:"index"`
@@ -22,14 +22,15 @@ func (Wallet) TableName() string {
 }
 
 // BalanceData represents the structure of the balances JSON field
-type BalanceData struct {
-	Coins float64 `json:"coins"`
-	EXP   float64 `json:"exp"`
-}
+type BalanceData map[string]float64
 
-// GetBalances parses the JSONB balances field into BalanceData
+
+// GetBalances parses the JSON balances field into BalanceData
 func (w *Wallet) GetBalances() (*BalanceData, error) {
 	var balances BalanceData
+	if len(w.Balances) == 0 {
+		return &balances, nil
+	}
 	if err := json.Unmarshal(w.Balances, &balances); err != nil {
 		return nil, err
 	}
@@ -42,6 +43,6 @@ func (w *Wallet) SetBalances(balances *BalanceData) error {
 	if err != nil {
 		return err
 	}
-	w.Balances = datatypes.JSON(data)
+	w.Balances = data
 	return nil
 }
